@@ -1,1 +1,5 @@
-/old
+.pytest_cache
+old
+google-cloud-sdk
+.ipynb_checkpoints
+__pycache__

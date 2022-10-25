@@ -1,7 +1,5 @@
 import pandas as pd
 import numpy as np
-from IPython.display import display
-import os
 import glob
 from sqlalchemy import create_engine
 
