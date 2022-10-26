@@ -1,6 +1,9 @@
+from lib2to3.pgen2.pgen import DFAState
+from locale import D_FMT
 import pandas as pd
 import numpy as np
 import glob
+from sqlalchemy import create_engine
 
 spacer = '*'*10
 path_prices = './datasets/prices'
@@ -236,3 +239,61 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         print('No PARQUET files found')
 
     return precio_final
+
+# Export files to SQL
+# Create sqlalchemy engine
+def ConnectSQL():
+    try:
+        engine = create_engine("mysql+pymysql://{user}:{pw}@localhost/{db}"
+                    .format(user="pythonuser",
+                            pw="borito333.",
+                            db="lab1"))
+        return engine
+    except:
+        print('Error connecting to SQL')
+
+
+
+# Get a list of files in the folder to compare
+def GetFiles():
+    #Get all files in the folder
+    try:
+        all_csv = glob.glob(path + "/*.csv")
+        all_xls = glob.glob(path + "/*.xls") +  glob.glob(path + "/*.xlsx")
+        all_json = glob.glob(path + "/*.json")
+        all_txt = glob.glob(path + "/*.txt")
+        all_parquet = glob.glob(path + "/*.parquet")
+
+        all_files = all_csv + all_xls + all_json + all_txt + all_parquet
+        
+        if len(all_files) == 0:
+            raise FileNotFoundError('No files found in the folder')
+
+    except:
+        print('Error with path or files GLOB ERROR')
+
+    return all_files
+
+
+# Load new files from S3 Bucket to SQL
+def LoadAndUploadNewPrecios(old, path_new):
+    engine = ConnectSQL()
+    lastfile = old[-1].split('/')[-1].split('.')[0]
+    newfile = glob.glob(path_new + "/*.csv")[-1].split('/')[-1].split('.')[0]
+    if lastfile == newfile:
+        print('No new files')
+    else:
+        df = FolderImporterPrecios(path = path_new)
+        df.to_sql('precios', con=engine, if_exists='append', index=False)
+        print('New files uploaded to SQL')
+
+
+
+def MakeQuery():
+    query = '''select avg(p.precio) from sucursal as s
+    join precios as p on (s.id = p.sucursal_id)
+    where s.id = '91688';'''
+    engine = ConnectSQL()
+    df = pd.read_sql(query, con=engine)
+    print(df)
+    return df

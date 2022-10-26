@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
 import glob
-from sqlalchemy import create_engine
+
 
 spacer = '*'*10
 path_base = './datasets/base/'
@@ -9,47 +8,39 @@ path_precio = './datasets/prices'
 
 from functions import *
 
-# Import files locally
-try:
-    producto = CleanProducto(FileImporter('producto', 'parquet', path = path_base))
-    print('Producto imported')
-except:
-    print('Error importing file for producto')
 
-try:
-    sucursal = CleanSucursal(FileImporter('sucursal', 'csv', path = path_base))
-    print('Sucursal imported')
-except:
-    print('Error importing file for sucursal')
+def LoadProducto():
+    try:
+        df = CleanProducto(FileImporter('producto', 'parquet', path = path_base))
+        df.to_csv('./datasets/base/clean/producto_clean.csv', index=False)
+        print('Producto Cleaned and Saved')
+    except:
+        print('Error cleaning Producto')
 
-try:
-    precios = FolderImporterPrecios(path_precio)
-    print('Precios imported')
-except:
-    print('Error importing files for precios')
+def LoadSucursal():
+    try:
+        df = CleanSucursal(FileImporter('sucursal', 'parquet', path = path_base))
+        df.to_csv('./datasets/base/clean/sucursal_clean.csv', index=False)
+        print('Sucursal Cleaned and Saved')
+    except:
+        print('Error cleaning Sucursal')
+
+def LoadPrecios():
+    try:
+        df = FolderImporterPrecios(path_precio)
+        df.to_csv('./datasets/prices/clean/precios_clean.csv', index=False)
+        print('Precios Cleaned and Saved')
+    except:
+        print('Error cleaning Precios')
 
 
-# Export files to SQL
-# Create sqlalchemy engine
-engine = create_engine("mysql+pymysql://{user}:{pw}@localhost/{db}"
-                       .format(user="pythonuser",
-                               pw="borito333.",
-                               db="lab1"))
-
-try:
-    producto.to_sql('producto', engine, if_exists='append', index=False)
-    print('Producto exported')
-except:
-    print('Error exporting file for producto')
-
-try:
-    sucursal.to_sql('sucursal', engine, if_exists='append', index=False)
-    print('Sucursal exported')
-except:
-    print('Error exporting file for sucursal')
-
-try:
-    precios.to_sql('precios', engine, if_exists='append', index=False)
-    print('Precios exported')
-except:
-    print('Error exporting files for precios')
+def UploadAll():
+    engine = ConnectSQL()
+    all_files = glob.glob('./datasets/base/clean/*.csv')
+    for filename in all_files:
+        try:
+            df = pd.read_csv(filename)
+            df.to_sql(filename.split('/')[-1].split('.')[0], con=engine, if_exists='replace', index=False)
+            print('Successfully uploaded ', filename)
+        except:
+            print('Error uploading ', filename)

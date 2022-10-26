@@ -3,3 +3,5 @@ old
 google-cloud-sdk
 .ipynb_checkpoints
 __pycache__
+logs
+plugins
