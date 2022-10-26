@@ -3,8 +3,9 @@ from airflow.utils.dates import days_ago
 from airflow import DAG 
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+
 from functions import *
-from loading import *
+from etl import *
 
 default_args = {
     'owner': 'Maico Bernal',
@@ -16,9 +17,8 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-path_base = './datasets/base/'
-path_precio = './datasets/prices'
-
+path_base = '/opt/airflow/dags/datasets/base'
+path_precio = '/opt/airflow/dags/datasets/prices'
 
 with DAG('UpdateDatabases', schedule_interval='@once', default_args=default_args) as dag:
     StartPipeline = EmptyOperator(
@@ -26,19 +26,14 @@ with DAG('UpdateDatabases', schedule_interval='@once', default_args=default_args
         dag = dag
         )
 
-    PythonLoad = PythonOperator(
-        task_id="LoadNewPrices",
-        python_callable=LoadNewPrecios,
-        )
-
-    Send2SQL = PythonOperator(
-        task_id="Send2SQL",
-        python_callable=UploadNewPrecios,
+    PythonLoadAndUpload = PythonOperator(
+        task_id="LoadAndUploadNewPrices",
+        python_callable=LoadAndUploadNewPrecios,
         )
 
     CheckNewPricesQuery = PythonOperator(
         task_id="CheckNewPricesQuery",
-        python_callable=MakeQueryUpdated,
+        python_callable=MakeQuery,
         )
 
     FinishPipeline = EmptyOperator(
@@ -47,4 +42,4 @@ with DAG('UpdateDatabases', schedule_interval='@once', default_args=default_args
     )
 
 
-StartPipeline >> PythonLoad >> Send2SQL >> CheckNewPricesQuery >> FinishPipeline
+StartPipeline >> PythonLoadAndUpload >> CheckNewPricesQuery >> FinishPipeline

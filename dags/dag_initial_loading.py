@@ -3,8 +3,8 @@ from airflow.utils.dates import days_ago
 from airflow import DAG 
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+
 from functions import *
-from loading import *
 from etl import *
 
 default_args = {
@@ -17,8 +17,8 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-path_base = './datasets/base/'
-path_precio = './datasets/prices'
+path_base = '/opt/airflow/dags/datasets/base/'
+path_precio = '/opt/airflow/dags/datasets/prices/'
 
 
 with DAG('InitialLoading', schedule_interval='@once', default_args=default_args) as dag:
@@ -48,7 +48,7 @@ with DAG('InitialLoading', schedule_interval='@once', default_args=default_args)
     )
 
     SqlLoad = PythonOperator(
-    task_id="SQLUploadProducto",
+    task_id="SQLUploadAll",
     python_callable=UploadAll,
     )
 

@@ -11,14 +11,13 @@ from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
 #Hook to connect to S3
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-#Import my functions
 from functions import *
-#from loading import *
+from etl import *
 
 old_files = GetFiles()
 
 #Set path for new files
-dest_file_path = '../datasets/prices/new/'
+dest_file_path = '/opt/airflow/minio_s3/'
 
 # Default arguments
 default_args = {
