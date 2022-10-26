@@ -6,3 +6,4 @@ sqlalchemy
 pymysql
 Flask
 gunicorn
+openpyxl

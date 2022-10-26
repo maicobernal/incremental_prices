@@ -3,6 +3,9 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.models.taskinstance import TaskInstance as ti
+from tempfile import NamedTemporaryFile
+
 
 #Check version of Airflow and Pip Amazon installed 
 #Sensor to check if the file is loaded in the bucket
@@ -14,10 +17,11 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from functions import *
 from etl import *
 
-old_files = GetFiles()
+#old_files = GetFiles()
 
 #Set path for new files
-dest_file_path = '/opt/airflow/minio_s3/'
+dest_file_path = '/opt/airflow/dags/datasets/minio/'
+dest_file_path_clean = '/opt/airflow/dags/datasets/minio/cleaned/'
 
 # Default arguments
 default_args = {
@@ -37,31 +41,38 @@ with DAG(
     CheckS3 = S3KeySensor(
 
         #https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/_api/airflow/providers/amazon/aws/sensors/s3/index.html
-        task_id='sensor_minio_s3', #Name of task
+        task_id='S3BucketSensorNewFiles', #Name of task
         bucket_name='data', #Support relative or full path
         bucket_key='precio*', #Only if we didn't specify the full path, or we want to use UNIx style wildcards
         wildcard_match = True, #Set to true if we want to use wildcards
         aws_conn_id='minio_conn', #Name of the connection
         mode='poke', #Poke or reschedule
         poke_interval=5,
-        timeout=30,
+        timeout=30
+    )
 
-        #https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/_api/airflow/providers/amazon/aws/hooks/s3/index.html?highlight=hooks#module-airflow.providers.amazon.aws.hooks.s3
-        #download_async = get_hook(), #Get the hook
-        #get_key = get_key(), #Get the key
-        #download_async.download_file(key = get_key, path = dest_file_path), #Download the file
-        #old_files.append(get_key),
-        #print(f"File {get_key} downloaded")
+    #Download the file from S3/Minio
+    DownloadFileFromS3 = PythonOperator(
+        task_id='DownloadFileFromS3',
+        python_callable=DownloadAndRenameFile,
+        op_kwargs={
+            'bucket_name': 'data',
+            'path': dest_file_path,
+            }
+    )
 
+    FinishDownload = EmptyOperator(
+        task_id='FinishDownload'
     )
 
     #Check for new files and load them
     PythonAndSQLLoad = PythonOperator(
         task_id="LoadNewPrices",
         python_callable=LoadAndUploadNewPrecios,
-        op_kwargs={'old_files': old_files, 'path': dest_file_path}
+        op_kwargs={'path_new': dest_file_path}
         )
 
+    #Make a Query to check if everything is fine
     CheckNewPricesQuery = PythonOperator(
         task_id="CheckNewPricesQuery",
         python_callable=MakeQuery,
@@ -73,4 +84,5 @@ with DAG(
     )
 
 
-CheckS3 >> PythonAndSQLLoad >> CheckNewPricesQuery >> FinishPipeline
+CheckS3 >> DownloadFileFromS3 >> FinishDownload
+FinishDownload >> PythonAndSQLLoad >> CheckNewPricesQuery >> FinishPipeline

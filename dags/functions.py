@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import glob
 from sqlalchemy import create_engine
+import os
+from airflow.models.taskinstance import TaskInstance as ti
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from tempfile import NamedTemporaryFile
 
 spacer = '*'*10
 path_prices = '/opt/airflow/dags/datasets/prices/'
@@ -156,7 +160,7 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         all_parquet = glob.glob(path + "/*.parquet")
 
         all_files = all_csv + all_xls + all_json + all_txt + all_parquet
-        
+
         if len(all_files) == 0:
             raise FileNotFoundError('No files found in the folder')
 
@@ -277,17 +281,12 @@ def GetFiles():
 
 
 # Load new files from S3 Bucket to SQL
-def LoadAndUploadNewPrecios(old, path_new):
+# NEED TO CHECK IF FILES ALREADY EXISTS IN FOLDER
+def LoadAndUploadNewPrecios(path_new):
     engine = ConnectSQL()
-    lastfile = old[-1].split('/')[-1].split('.')[0]
-    newfile = glob.glob(path_new + "/*.csv")[-1].split('/')[-1].split('.')[0]
-    if lastfile == newfile:
-        print('No new files')
-    else:
-        df = FolderImporterPrecios(path = path_new)
-        df.to_sql('precios', con=engine, if_exists='append', index=False)
-        print('New files uploaded to SQL')
-
+    df = FolderImporterPrecios(path = path_new)
+    df.to_sql('precios', con=engine, if_exists='append', index=False)
+    print('New files uploaded to SQL')
 
 
 def MakeQuery():
@@ -298,3 +297,21 @@ def MakeQuery():
     df = pd.read_sql(query, con=engine)
     print(df)
     return 'Query done successfully'
+
+
+def DownloadAndRenameFile(bucket_name:str, path:str):
+    hook = S3Hook('minio_conn')
+    files = hook.list_keys(bucket_name=bucket_name)
+    key = files[-1]
+    file_name = hook.download_file(key=key, bucket_name=bucket_name, local_path=path)
+    RenameFile(file_name, key)
+    return file_name
+
+def RenameFile(file_name:str, new_name:str) -> None:
+    downloaded_file_path = '/'.join(file_name.split('/')[:-1])
+    os.rename(src=file_name, dst=f'{downloaded_file_path}/{new_name}')
+    print('Renamed successfully')
+
+
+
+
