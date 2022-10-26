@@ -38,21 +38,20 @@ with DAG(
 
         #https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/_api/airflow/providers/amazon/aws/sensors/s3/index.html
         task_id='sensor_minio_s3', #Name of task
-        bucket_name='data/prices/', #Support relative or full path
+        bucket_name='data', #Support relative or full path
         bucket_key='precio*', #Only if we didn't specify the full path, or we want to use UNIx style wildcards
-        wildcard_match = True #Set to true if we want to use wildcards
+        wildcard_match = True, #Set to true if we want to use wildcards
         aws_conn_id='minio_conn', #Name of the connection
         mode='poke', #Poke or reschedule
         poke_interval=5,
-        timeout=30
+        timeout=30,
 
         #https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/_api/airflow/providers/amazon/aws/hooks/s3/index.html?highlight=hooks#module-airflow.providers.amazon.aws.hooks.s3
-        download_async = get_hook() #Get the hook
-        get_key = get_key() #Get the key
-        download_async.download_file(key = get_key, path = dest_file_path) #Download the file
-        old_files_n +=1
-        old_files.append(get_key)
-        print(f"File {get_key} downloaded")
+        #download_async = get_hook(), #Get the hook
+        #get_key = get_key(), #Get the key
+        #download_async.download_file(key = get_key, path = dest_file_path), #Download the file
+        #old_files.append(get_key),
+        #print(f"File {get_key} downloaded")
 
     )
 

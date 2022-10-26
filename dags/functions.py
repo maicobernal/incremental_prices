@@ -241,6 +241,7 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
 
 # Export files to SQL
 # Create sqlalchemy engine
+# BEWARE OF IP ADDRESS IT CAN CHANGE WITH WIFI ROUTER RESTART
 def ConnectSQL():
     try:
         engine = create_engine("mysql+pymysql://{user}:{pw}@{address}/{db}"
@@ -258,11 +259,11 @@ def ConnectSQL():
 def GetFiles():
     #Get all files in the folder
     try:
-        all_csv = glob.glob(path + "/*.csv")
-        all_xls = glob.glob(path + "/*.xls") +  glob.glob(path + "/*.xlsx")
-        all_json = glob.glob(path + "/*.json")
-        all_txt = glob.glob(path + "/*.txt")
-        all_parquet = glob.glob(path + "/*.parquet")
+        all_csv = glob.glob(path_prices + "/*.csv")
+        all_xls = glob.glob(path_prices + "/*.xls") +  glob.glob(path_prices + "/*.xlsx")
+        all_json = glob.glob(path_prices + "/*.json")
+        all_txt = glob.glob(path_prices + "/*.txt")
+        all_parquet = glob.glob(path_prices + "/*.parquet")
 
         all_files = all_csv + all_xls + all_json + all_txt + all_parquet
         
