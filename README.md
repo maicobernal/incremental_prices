@@ -17,7 +17,7 @@ Los datos corresponden a una lista de precios del año 2020, si bien no se espec
 ## Video explicativo de su funcionalidad: [LINK](https://www.youtube.com/watch?v=ByezDSYMkdw)
 
 ## Esquema
-![](./images/diagrama.png)
+![](https://github.com/maicobernal/henrylab1/blob/main/images/diagrama.png)
 
 
 ## Principales componentes:
@@ -38,13 +38,13 @@ Los datos corresponden a una lista de precios del año 2020, si bien no se espec
 
 ## Airflow: Dos DAGs principales:
 ### Initial_Loading
-![](./images/dag1.png)
+![](https://github.com/maicobernal/henrylab1/blob/main/images/dag1.png)
 
 Gestiona la carga incremental de los archivos iniciales, a posterior se hace una limpieza y se almacena temporalmente en CSV (Airflow no permite returns entre tasks de más de 48kb), y posteriormente se realiza la carga en la base de datos de MySQL, la cuál corre de forma local en la computadora. 
 
 ### DAG_Minio_S3_Wait_for_File
-![](./images/dag2.png)
-![](./images/minio.png)
+![](https://github.com/maicobernal/henrylab1/blob/main/images/dag2.png)
+![](https://github.com/maicobernal/henrylab1/blob/main/images/minio.png)
 
 Este DAG consta de dos partes: Para su correcta funcionalidad se realizó la conexión pertinente entre Airflow y Minio Storage Service (el cuál corre a traves de un contenedor de Docker). 
 Minio permite la utilización de la API de AWS para la gestión de archivos vía Airflow, lo cuál permitiría en una instancia posterior facilitar en deploy en la nube. 
