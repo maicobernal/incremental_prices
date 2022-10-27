@@ -26,7 +26,49 @@ Los datos corresponden a una lista de precios del año 2020, si bien no se espec
 ##### - Docker Desktop 4.12
 ##### - Airflow 2.42 Official Docker Image con Python 3.7: Solamente Webserver, Scheduler y Postgre
 ##### - Image Extending para instalación de librerias adicionales en Airflow (Pandas, SQLAlchemy, Flask)
-##### - MinIO Object Storage Server RELEASE.2022-10-24T18-35-07Z
+##### - MinIO Object Storage Server RELEASE.2022-10-24T18-35-07Z 
+
+
+
+## Instalación de containers:
+#### Puede variar segun OS y arquitectura(testeado en ARM64/MacOS Monterrey 12.6)
+1) MinIO RootFull, ver documentación oficial segun OS --> [LINK](https://min.io/docs/minio/container/index.html)
+
+- Instalación:
+```rb
+mkdir -p ~/minio/data
+docker run \
+   -p 9000:9000 \
+   -p 9090:9090 \
+   --name minio \
+   -v ~/minio/data:/data \
+   -e "MINIO_ROOT_USER=ROOTNAME" \
+   -e "MINIO_ROOT_PASSWORD=CHANGEME123" \
+   quay.io/minio/minio server /data --console-address ":9090"
+```
+
+Luego conectar desde Airflow entrando en Config --> Connections --> Generic.
+- En conn_ID colocar: "minio_conn" sin comillas
+- En el campo Extra colocar:
+
+```rb
+{
+    "aws_access_key_id": "ROOTNAME", 
+    "aws_secret_access_key": "CHANGEME123", 
+    "host": "http://host.docker.internal:9000"
+}
+```
+
+2) Airflow: pasos secuenciales, ver documentación oficial --> [LINK](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html)
+
+```rb
+0) mkdir ./dags ./logs ./plugins
+1) docker-compose up airflow-init
+2) docker-compose up
+3) docker-compose down
+4) docker-compose build (instala las librerias de Python en el container de Airflow)
+5) docker-compose up
+```
 
 ## Python: descripción de principales funciones (ETL.py | Functions.py)
 
@@ -34,7 +76,8 @@ Los datos corresponden a una lista de precios del año 2020, si bien no se espec
 <b>- FolderImporterPrecios:</b> detección automática de archivos en directorio, soporte de múltiples formatos (XLSX, TXT, CSV, Parquet, JSON) y limpieza posterior. Devuelve un archivo único con valores estandarizados. 
 <b>- CleanSucursal, CleanProducto, CleanPrecios:</b> Normalización de los datos.
 <b>- DownloadAndRenameFile:</b> Gestiona la descarga de archivos desde el Bucket de Minio. 
-
+<b>- Dag_Initial_Loading:</b> Gestiona la carga/cleaning y upload a MySQL incremental de archivos locales en Airflow
+<b>- Dag_S3Bucket_Loading:</b> Gestiona el S3Sensor para vigilar nuevos archivos que se carguen a Minio Bucket y luego activa el S3Hook para realizar descarga, renombre, limpieza y upload a MySQL de los archivos de forma incremental en Airflow. Al hacer un trigger de prueba tiene una ventana de 30 segundos para hacer la carga (se puede modificar). 
 
 ## Airflow: Dos DAGs principales:
 ### Initial_Loading
