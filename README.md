@@ -14,7 +14,7 @@ Los datos corresponden a una lista de precios del año 2020, si bien no se espec
 - Incorporación de Multi-Cloud Object Storage compatible con AWS S3 (uso de sensors y hooks)
 - Visualización básica en HTML de querys via Flask
 
-## Video explicativo de su funcionalidad: [LINK](https://www.youtube.com/watch?v=ByezDSYMkdw)
+## Video explicativo de su funcionalidad: [LINK](https://youtu.be/O7SpR_09q3A)
 
 ## Esquema
 ![](https://github.com/maicobernal/henrylab1/blob/main/images/diagrama.png)
