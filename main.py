@@ -2,9 +2,6 @@ import os
 from flask import Flask
 from my_functions.functions import MakeQuery
 
-from my_functions.functions import *
-from my_functions.etl import *
-
 query = '''select avg(p.precio) from sucursal as s
 join precios as p on (s.id = p.sucursal_id)
 where s.id = '91688';'''

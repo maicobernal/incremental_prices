@@ -3,9 +3,9 @@ import numpy as np
 import glob
 from sqlalchemy import create_engine
 import os
-from airflow.models.taskinstance import TaskInstance as ti
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from tempfile import NamedTemporaryFile
+#from airflow.models.taskinstance import TaskInstance as ti
+#from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+#from tempfile import NamedTemporaryFile
 
 spacer = '*'*10
 path_prices = '/opt/airflow/dags/datasets/prices/'
@@ -307,7 +307,7 @@ def MakeQuery():
     engine = ConnectSQL()
     df = pd.read_sql(query, con=engine)
     print(df)
-    return 'Query done successfully'
+    return df
 
 
 def DownloadAndRenameFile(bucket_name:str, path:str):
