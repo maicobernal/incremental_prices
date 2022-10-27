@@ -1,13 +1,15 @@
-from lib2to3.pgen2.pgen import DFAState
-from locale import D_FMT
 import pandas as pd
 import numpy as np
 import glob
 from sqlalchemy import create_engine
+import os
+from airflow.models.taskinstance import TaskInstance as ti
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from tempfile import NamedTemporaryFile
 
 spacer = '*'*10
-path_prices = './datasets/prices'
-path = './datasets/'
+path_prices = '/opt/airflow/dags/datasets/prices/'
+path_other = '/opt/airflow/dags/datasets/base/'
 
 #Import a single file, 
 # name = filename
@@ -16,7 +18,7 @@ path = './datasets/'
 # spacer = separator for CSV/TXT
 # encoding = encoding for CSV/TXT
 
-def FileImporter (name: str, tipo: str, spacer:str = ',', path:str = path, encoding:str = 'utf-8', sheet:int = 0):
+def FileImporter (name: str, tipo: str, spacer:str = ',', path:str = path_other, encoding:str = 'utf-8', sheet:int = 0):
 
     #Raise and error if type of file is not declared
     if tipo == '':
@@ -63,8 +65,6 @@ def FileImporter (name: str, tipo: str, spacer:str = ',', path:str = path, encod
         print('Importing successfully done for ', file)
 
 
-#Import all files in a folder, path = path to folder, spacer = separator for CSV/TXT
-
 
 
 
@@ -85,7 +85,8 @@ def CleanProducto(df):
     df['marca'] = NormalizeColumn(df, 'marca')
     df['id'] = NormalizeColumn(df, 'id')
     df['id'] = df['id'].str.replace('-', '').astype(int)
-    df['nombre'] = df['nombre'].str.split(r"\s\d*\s", regex=True, expand=False).str[0].str.upper()
+    df['nombre'] = df['nombre'].str.split('\s\d*\s', expand=False).str[0].str.upper()
+
     return df
 
 
@@ -111,32 +112,32 @@ def CleanPrecios(df):
     #Set order of columns
     col_order = ['precio', 'sucursal_id', 'producto_id']
 
-    #Get percentage of null values for each columns and return it in a list
-    checkna = df.isna().sum().div(df.shape[0]).mul(100).round(3).tolist()
+    #Get a mean percentage of null values for all data
+    checkna = sum(df.isna().sum().div(df.shape[0]).mul(100).round(3).tolist())/3
 
-    #If NA <1% then drop the column else raise an error
-    for i in checkna:
-        if i < 1:
-            print('Not many null values less than 1%')
-            df.dropna(inplace=True)
-            break
-        else:
-            raise ValueError('There are too many null values in the dataset, check it')
+    #If NA <5% then drop the column else raise an error
+    if checkna < 5:
+        print('Not many null values less than 5%')
+        df.dropna(inplace=True)
+    else:
+        raise ValueError('There are too many null values in the dataset, check it or modify the script')
 
     #Clean sucursal_id and keep only real sucursal ID          
     try: 
-        df['sucursal_id'] = df['sucursal_id'].str.replace('-', '').astype(int)       
-        #df['sucursal_id'] = df['sucursal_id'].str.split('-', regex=False, expand=False).str[2].astype(int)
+        if df['sucursal_id'].dtype == object:
+            df['sucursal_id'] = df['sucursal_id'].astype(str).str.replace('[^0-9]+', '', regex = True).astype(int)
+
     except:
-        print('sucursal_id already cleaned')
-        pass
+        print('Error trying to clean sucursal_id, check the column')
 
     #Clean producto ID
     try:
-        df['producto_id'] = df['producto_id'].str.replace('-', '').astype(int)
+        print('Type of producto_id is: ', df['producto_id'].dtype)
+        if df['producto_id'].dtype == object:
+            df['producto_id'] = df['producto_id'].astype(str).str.replace('[^0-9]+', '', regex = True).astype(int)
+            
     except:
-        print('producto_id already cleaned')
-        pass
+        print('Error trying to clean producto_id, check the column')
 
     #Clean precio
     df['precio'] = df['precio'].apply(pd.to_numeric, errors='coerce')
@@ -157,7 +158,7 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         all_parquet = glob.glob(path + "/*.parquet")
 
         all_files = all_csv + all_xls + all_json + all_txt + all_parquet
-        
+
         if len(all_files) == 0:
             raise FileNotFoundError('No files found in the folder')
 
@@ -170,6 +171,7 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
     li_json = []
     li_txt = []
     li_parquet = []
+    precio_final = []
 
 
     #Get all CSV in the folder
@@ -184,21 +186,28 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
                 print('File imported with utf-16 encoding')
             finally:
                 print('Importing successfully done for ', filename)
-        precio_final = pd.concat(li_csv, axis=0, ignore_index=True)
+        
+        print('All CSV files imported and cleaned successfully')
     else:
         print('No CSV files found')
 
     
     #Get all XLS/XLSX in the folder
     if len(all_xls) > 0:
-        for filename in all_xls:
-            df = pd.read_excel(filename, sheet_name=None)
-            if type(df) == dict:
-                for key in df:
-                    li_xls.append(CleanPrecios(df[key]))
-            else:
-                li_xls.append(CleanPrecios(df))
-        precio_final = pd.concat(li_xls, axis=0, ignore_index=True)
+        try:
+            for filename in all_xls:
+                df = pd.read_excel(filename, parse_dates=False, sheet_name=None, dtype={'precio': float, 'sucursal_id': object, 'producto_id': object})
+                if type(df) == dict:
+                    for key in df:
+                        li_xls.append(CleanPrecios(df[key]))
+                else:
+                    li_xls.append(CleanPrecios(df))
+        except:
+            print('Error importing XLS/XLSX files')
+        finally:
+            print('Importing successfully done for ', filename)
+        
+        print('All XLS/XLSX files imported and cleaned successfully')
     else:
         print('No XLS/XLSX files found')
 
@@ -208,7 +217,8 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         for filename in all_json:
             df = pd.read_json(filename)
             li_json.append(CleanPrecios(df))
-        precio_final = pd.concat(li_json, axis=0, ignore_index=True)
+        
+        print('All JSON files imported and cleaned successfully')
     else:
         print('No JSON files found')
 
@@ -225,7 +235,8 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
                 li_txt.append(CleanPrecios(df))
             finally:
                 print('Importing successfully done for ', filename)
-        precio_final = pd.concat(li_txt, axis=0, ignore_index=True)
+        
+        print('All TXT files imported and cleaned successfully')
     else:
         print('No TXT files found')
 
@@ -234,18 +245,23 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         for filename in all_parquet:
             df = pd.read_parquet(filename)
             li_parquet.append(CleanPrecios(df))
-        precio_final = pd.concat(li_parquet, axis=0, ignore_index=True)
+        
+        print('All PARQUET files imported and cleaned successfully')
     else:
         print('No PARQUET files found')
 
+    #Concatenate all files
+    precio_final = pd.concat(li_csv + li_xls + li_json + li_txt + li_parquet, axis=0, ignore_index=True)
     return precio_final
 
 # Export files to SQL
 # Create sqlalchemy engine
+# BEWARE OF IP ADDRESS IT CAN CHANGE WITH WIFI ROUTER RESTART
 def ConnectSQL():
     try:
-        engine = create_engine("mysql+pymysql://{user}:{pw}@localhost/{db}"
+        engine = create_engine("mysql+pymysql://{user}:{pw}@{address}/{db}"
                     .format(user="pythonuser",
+                            address = '192.168.0.8:3306',
                             pw="borito333.",
                             db="lab1"))
         return engine
@@ -258,11 +274,11 @@ def ConnectSQL():
 def GetFiles():
     #Get all files in the folder
     try:
-        all_csv = glob.glob(path + "/*.csv")
-        all_xls = glob.glob(path + "/*.xls") +  glob.glob(path + "/*.xlsx")
-        all_json = glob.glob(path + "/*.json")
-        all_txt = glob.glob(path + "/*.txt")
-        all_parquet = glob.glob(path + "/*.parquet")
+        all_csv = glob.glob(path_prices + "/*.csv")
+        all_xls = glob.glob(path_prices + "/*.xls") +  glob.glob(path_prices + "/*.xlsx")
+        all_json = glob.glob(path_prices + "/*.json")
+        all_txt = glob.glob(path_prices + "/*.txt")
+        all_parquet = glob.glob(path_prices + "/*.parquet")
 
         all_files = all_csv + all_xls + all_json + all_txt + all_parquet
         
@@ -276,17 +292,12 @@ def GetFiles():
 
 
 # Load new files from S3 Bucket to SQL
-def LoadAndUploadNewPrecios(old, path_new):
+# NEED TO CHECK IF FILES ALREADY EXISTS IN FOLDER
+def LoadAndUploadNewPrecios(path_new):
     engine = ConnectSQL()
-    lastfile = old[-1].split('/')[-1].split('.')[0]
-    newfile = glob.glob(path_new + "/*.csv")[-1].split('/')[-1].split('.')[0]
-    if lastfile == newfile:
-        print('No new files')
-    else:
-        df = FolderImporterPrecios(path = path_new)
-        df.to_sql('precios', con=engine, if_exists='append', index=False)
-        print('New files uploaded to SQL')
-
+    df = FolderImporterPrecios(path = path_new)
+    df.to_sql('precios', con=engine, if_exists='append', index=False)
+    print('New files uploaded to SQL')
 
 
 def MakeQuery():
@@ -296,4 +307,22 @@ def MakeQuery():
     engine = ConnectSQL()
     df = pd.read_sql(query, con=engine)
     print(df)
-    return df
+    return 'Query done successfully'
+
+
+def DownloadAndRenameFile(bucket_name:str, path:str):
+    hook = S3Hook('minio_conn')
+    files = hook.list_keys(bucket_name=bucket_name)
+    key = files[-1]
+    file_name = hook.download_file(key=key, bucket_name=bucket_name, local_path=path)
+    RenameFile(file_name, key)
+    return file_name
+
+def RenameFile(file_name:str, new_name:str) -> None:
+    downloaded_file_path = '/'.join(file_name.split('/')[:-1])
+    os.rename(src=file_name, dst=f'{downloaded_file_path}/{new_name}')
+    print('Renamed successfully')
+
+
+
+

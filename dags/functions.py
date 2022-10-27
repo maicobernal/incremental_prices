@@ -65,8 +65,6 @@ def FileImporter (name: str, tipo: str, spacer:str = ',', path:str = path_other,
         print('Importing successfully done for ', file)
 
 
-#Import all files in a folder, path = path to folder, spacer = separator for CSV/TXT
-
 
 
 
@@ -114,32 +112,32 @@ def CleanPrecios(df):
     #Set order of columns
     col_order = ['precio', 'sucursal_id', 'producto_id']
 
-    #Get percentage of null values for each columns and return it in a list
-    checkna = df.isna().sum().div(df.shape[0]).mul(100).round(3).tolist()
+    #Get a mean percentage of null values for all data
+    checkna = sum(df.isna().sum().div(df.shape[0]).mul(100).round(3).tolist())/3
 
-    #If NA <1% then drop the column else raise an error
-    for i in checkna:
-        if i < 1:
-            print('Not many null values less than 1%')
-            df.dropna(inplace=True)
-            break
-        else:
-            raise ValueError('There are too many null values in the dataset, check it')
+    #If NA <5% then drop the column else raise an error
+    if checkna < 5:
+        print('Not many null values less than 5%')
+        df.dropna(inplace=True)
+    else:
+        raise ValueError('There are too many null values in the dataset, check it or modify the script')
 
     #Clean sucursal_id and keep only real sucursal ID          
     try: 
-        df['sucursal_id'] = df['sucursal_id'].str.replace('-', '').astype(int)       
-        #df['sucursal_id'] = df['sucursal_id'].str.split('-', regex=False, expand=False).str[2].astype(int)
+        if df['sucursal_id'].dtype == object:
+            df['sucursal_id'] = df['sucursal_id'].astype(str).str.replace('[^0-9]+', '', regex = True).astype(int)
+
     except:
-        print('sucursal_id already cleaned')
-        pass
+        print('Error trying to clean sucursal_id, check the column')
 
     #Clean producto ID
     try:
-        df['producto_id'] = df['producto_id'].str.replace('-', '').astype(int)
+        print('Type of producto_id is: ', df['producto_id'].dtype)
+        if df['producto_id'].dtype == object:
+            df['producto_id'] = df['producto_id'].astype(str).str.replace('[^0-9]+', '', regex = True).astype(int)
+            
     except:
-        print('producto_id already cleaned')
-        pass
+        print('Error trying to clean producto_id, check the column')
 
     #Clean precio
     df['precio'] = df['precio'].apply(pd.to_numeric, errors='coerce')
@@ -173,6 +171,7 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
     li_json = []
     li_txt = []
     li_parquet = []
+    precio_final = []
 
 
     #Get all CSV in the folder
@@ -187,21 +186,28 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
                 print('File imported with utf-16 encoding')
             finally:
                 print('Importing successfully done for ', filename)
-        precio_final = pd.concat(li_csv, axis=0, ignore_index=True)
+        
+        print('All CSV files imported and cleaned successfully')
     else:
         print('No CSV files found')
 
     
     #Get all XLS/XLSX in the folder
     if len(all_xls) > 0:
-        for filename in all_xls:
-            df = pd.read_excel(filename, sheet_name=None)
-            if type(df) == dict:
-                for key in df:
-                    li_xls.append(CleanPrecios(df[key]))
-            else:
-                li_xls.append(CleanPrecios(df))
-        precio_final = pd.concat(li_xls, axis=0, ignore_index=True)
+        try:
+            for filename in all_xls:
+                df = pd.read_excel(filename, parse_dates=False, sheet_name=None, dtype={'precio': float, 'sucursal_id': object, 'producto_id': object})
+                if type(df) == dict:
+                    for key in df:
+                        li_xls.append(CleanPrecios(df[key]))
+                else:
+                    li_xls.append(CleanPrecios(df))
+        except:
+            print('Error importing XLS/XLSX files')
+        finally:
+            print('Importing successfully done for ', filename)
+        
+        print('All XLS/XLSX files imported and cleaned successfully')
     else:
         print('No XLS/XLSX files found')
 
@@ -211,7 +217,8 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         for filename in all_json:
             df = pd.read_json(filename)
             li_json.append(CleanPrecios(df))
-        precio_final = pd.concat(li_json, axis=0, ignore_index=True)
+        
+        print('All JSON files imported and cleaned successfully')
     else:
         print('No JSON files found')
 
@@ -228,7 +235,8 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
                 li_txt.append(CleanPrecios(df))
             finally:
                 print('Importing successfully done for ', filename)
-        precio_final = pd.concat(li_txt, axis=0, ignore_index=True)
+        
+        print('All TXT files imported and cleaned successfully')
     else:
         print('No TXT files found')
 
@@ -237,10 +245,13 @@ def FolderImporterPrecios (path:str = path_prices, spacer:str = ',', spacer_txt:
         for filename in all_parquet:
             df = pd.read_parquet(filename)
             li_parquet.append(CleanPrecios(df))
-        precio_final = pd.concat(li_parquet, axis=0, ignore_index=True)
+        
+        print('All PARQUET files imported and cleaned successfully')
     else:
         print('No PARQUET files found')
 
+    #Concatenate all files
+    precio_final = pd.concat(li_csv + li_xls + li_json + li_txt + li_parquet, axis=0, ignore_index=True)
     return precio_final
 
 # Export files to SQL
