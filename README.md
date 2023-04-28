@@ -44,7 +44,7 @@ docker run \
    -v ~/minio/data:/data \
    -e "MINIO_ROOT_USER=ROOTNAME" \
    -e "MINIO_ROOT_PASSWORD=CHANGEME123" \
-   quay.io/minio/minio server /data --console-address ":9090"
+   quay.io/minio/minio:RELEASE.2022-10-24T18-35-07Z server /data --console-address ":9090"
 ```
 
 Luego conectar desde Airflow entrando en Config --> Connections --> Generic.
